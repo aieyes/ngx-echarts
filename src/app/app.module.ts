@@ -33,7 +33,7 @@ registerLocaleData(en);
     HttpClientModule,
     BrowserAnimationsModule,
     NgxEchartsModule.forRoot({
-      echarts: () => import('echarts'), // Import all modules from echarts:
+      echarts: 'https://cdn.jsdelivr.net/npm/echarts@4.9.0/dist/echarts.min.js',
     }),
   ],
   providers: [

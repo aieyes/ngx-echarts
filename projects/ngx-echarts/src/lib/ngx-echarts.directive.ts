@@ -14,13 +14,16 @@ import {
   Output,
   SimpleChanges,
 } from '@angular/core';
-import { fromEvent, Observable, Subscription } from 'rxjs';
+import {fromEvent, Observable, Subscription} from 'rxjs';
 import { debounceTime, switchMap } from 'rxjs/operators';
 import { ChangeFilter } from './change-filter';
 
 export interface NgxEchartsConfig {
   echarts: any | (() => Promise<any>);
 }
+
+declare var document: any;
+declare var echarts: any;
 
 export const NGX_ECHARTS_CONFIG = new InjectionToken<NgxEchartsConfig>('NGX_ECHARTS_CONFIG');
 
@@ -91,6 +94,13 @@ export class NgxEchartsDirective implements OnChanges, OnDestroy, OnInit, DoChec
   private currentOffsetHeight = 0;
   private currentWindowWidth: number;
   private resizeSub: Subscription;
+
+  private resources: any = {
+    echarts: {
+      src: null,
+      loaded: false
+    }
+  };
 
   constructor(
     @Inject(NGX_ECHARTS_CONFIG) config: NgxEchartsConfig,
@@ -198,12 +208,65 @@ export class NgxEchartsDirective implements OnChanges, OnDestroy, OnInit, DoChec
 
     // here a bit tricky: we check if the echarts module is provided as function returning native import('...') then use the promise
     // otherwise create the function that imitates behaviour above with a provided as is module
-    return this.ngZone.runOutsideAngular(() => {
-      const load =
-        typeof this.echarts === 'function' ? this.echarts : () => Promise.resolve(this.echarts);
+    const configType = typeof this.echarts;
+    if (configType === 'string') {
+      if ('echarts' in window) { // already loaded
+        return this.ngZone.runOutsideAngular( () => {
+          return Promise.resolve(echarts).then( ({init}) => init(dom, this.theme, this.initOpts));
+        });
+      } else {  // async load, error may occur while using connect charts feature
+        return this.ngZone.runOutsideAngular(async () => {
+          this.resources.echarts.src = this.echarts;
+          await this.load('echarts');
+          return Promise.resolve(echarts).then( ({init}) => init(dom, this.theme, this.initOpts));
+        });
+      }
+    } else {
+      return this.ngZone.runOutsideAngular( () => {
+        const load =
+          typeof this.echarts === 'function' ? this.echarts : () => Promise.resolve(this.echarts);
+        return load().then(({ init }) => init(dom, this.theme, this.initOpts));
+      });
+    }
+  }
 
-      return load().then(({ init }) => init(dom, this.theme, this.initOpts));
+  async load(...res: string[]) {
+    const promises: any[] = [];
+    res.forEach((o) => promises.push(this.loadRes(o)));
+    return Promise.all(promises);
+  }
+
+  loadRes(name: string) {
+    return new Promise((resolve, reject) => {
+      // resolve if already loaded
+      if (this.resources[name].loaded) {
+        resolve({res: name, loaded: true, status: 'Already Loaded'});
+      } else {
+        const script = document.createElement('script');
+        script.type = 'text/javascript';
+        script.src = this.resources[name].src;
+        this.appendResource(name, script, resolve);
+      }
     });
+  }
+
+  private appendResource(name, res, resolve) {
+    if (res.readyState) {  // IE
+      res.onreadystatechange = () => {
+        if (res.readyState === 'loaded' || res.readyState === 'complete') {
+          res.onreadystatechange = null;
+          this.resources[name].loaded = true;
+          resolve({res: name, loaded: true, status: 'Loaded'});
+        }
+      };
+    } else {  // Others
+      res.onload = () => {
+        this.resources[name].loaded = true;
+        resolve({res: name, loaded: true, status: 'Loaded'});
+      };
+    }
+    res.onerror = (error: any) => resolve({res: name, loaded: false, status: 'Loaded'});
+    document.getElementsByTagName('head')[0].appendChild(res);
   }
 
   private async initChart() {

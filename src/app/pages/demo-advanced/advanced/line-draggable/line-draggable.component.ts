@@ -1,6 +1,6 @@
 import { Component, OnDestroy } from '@angular/core';
-import * as echarts from 'echarts';
 declare const require: any; // DEMO IGNORE
+declare var echarts: any;
 
 const SymbolSize = 20;
 const Data = [
@@ -82,7 +82,7 @@ export class LineDraggableComponent implements OnDestroy {
     }
   }
 
-  onChartReady(myChart: echarts.ECharts) {
+  onChartReady(myChart: any) {
     const onPointDragging = function(dataIndex) {
       Data[dataIndex] = myChart.convertFromPixel({ gridIndex: 0 }, this.position) as number[];
 

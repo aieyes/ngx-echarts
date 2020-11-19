@@ -1,6 +1,7 @@
 import { Component, AfterViewInit } from '@angular/core';
-import { getInstanceByDom, connect } from 'echarts';
+// import { getInstanceByDom, connect } from 'echarts';
 declare const require: any; // DEMO IGNORE
+declare const echarts: any;
 
 @Component({
   selector: 'app-connect-charts',
@@ -53,9 +54,10 @@ export class ConnectChartsComponent implements AfterViewInit {
     setTimeout(() => {
       const chartElement1 = document.getElementById('chart1');
       const chartElement2 = document.getElementById('chart2');
-      const chart1 = getInstanceByDom(chartElement1);
-      const chart2 = getInstanceByDom(chartElement2);
-      connect([chart1, chart2]);
+      const chart1 = echarts.getInstanceByDom(chartElement1);
+      const chart2 = echarts.getInstanceByDom(chartElement2);
+      // errors may occur while echarts is loading from cdn
+      echarts.connect([chart1, chart2]);
     });
   }
 }
