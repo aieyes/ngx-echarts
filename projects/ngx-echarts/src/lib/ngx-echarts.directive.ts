@@ -17,6 +17,7 @@ import {
 import {fromEvent, Observable, Subscription} from 'rxjs';
 import { debounceTime, switchMap } from 'rxjs/operators';
 import { ChangeFilter } from './change-filter';
+import {RESOURCE, loadRes} from './ngx-echarts.common';
 
 export interface NgxEchartsConfig {
   echarts: any | (() => Promise<any>);
@@ -94,13 +95,6 @@ export class NgxEchartsDirective implements OnChanges, OnDestroy, OnInit, DoChec
   private currentOffsetHeight = 0;
   private currentWindowWidth: number;
   private resizeSub: Subscription;
-
-  private resources: any = {
-    echarts: {
-      src: null,
-      loaded: false
-    }
-  };
 
   constructor(
     @Inject(NGX_ECHARTS_CONFIG) config: NgxEchartsConfig,
@@ -211,12 +205,14 @@ export class NgxEchartsDirective implements OnChanges, OnDestroy, OnInit, DoChec
     const configType = typeof this.echarts;
     if (configType === 'string') {
       if ('echarts' in window) { // already loaded
+        // console.log('echarts already loaded');
         return this.ngZone.runOutsideAngular( () => {
           return Promise.resolve(echarts).then( ({init}) => init(dom, this.theme, this.initOpts));
         });
       } else {  // async load, error may occur while using connect charts feature
+        // console.log('load echarts async');
         return this.ngZone.runOutsideAngular(async () => {
-          this.resources.echarts.src = this.echarts;
+          RESOURCE.echarts.src = this.echarts;
           await this.load('echarts');
           return Promise.resolve(echarts).then( ({init}) => init(dom, this.theme, this.initOpts));
         });
@@ -232,41 +228,8 @@ export class NgxEchartsDirective implements OnChanges, OnDestroy, OnInit, DoChec
 
   async load(...res: string[]) {
     const promises: any[] = [];
-    res.forEach((o) => promises.push(this.loadRes(o)));
+    res.forEach((o) => promises.push(loadRes(o)));
     return Promise.all(promises);
-  }
-
-  loadRes(name: string) {
-    return new Promise((resolve, reject) => {
-      // resolve if already loaded
-      if (this.resources[name].loaded) {
-        resolve({res: name, loaded: true, status: 'Already Loaded'});
-      } else {
-        const script = document.createElement('script');
-        script.type = 'text/javascript';
-        script.src = this.resources[name].src;
-        this.appendResource(name, script, resolve);
-      }
-    });
-  }
-
-  private appendResource(name, res, resolve) {
-    if (res.readyState) {  // IE
-      res.onreadystatechange = () => {
-        if (res.readyState === 'loaded' || res.readyState === 'complete') {
-          res.onreadystatechange = null;
-          this.resources[name].loaded = true;
-          resolve({res: name, loaded: true, status: 'Loaded'});
-        }
-      };
-    } else {  // Others
-      res.onload = () => {
-        this.resources[name].loaded = true;
-        resolve({res: name, loaded: true, status: 'Loaded'});
-      };
-    }
-    res.onerror = (error: any) => resolve({res: name, loaded: false, status: 'Loaded'});
-    document.getElementsByTagName('head')[0].appendChild(res);
   }
 
   private async initChart() {
